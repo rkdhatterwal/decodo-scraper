@@ -2,6 +2,7 @@
 
 namespace Rkdhatterwal\DecodoScraper;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
@@ -31,11 +32,16 @@ use Rkdhatterwal\DecodoScraper\Models\DecodoTask;
 class AsyncDecodoClient
 {
     private string $baseUrl;
-    private int    $timeout;
-    private array  $defaults;
-    private bool   $dbEnabled;
-    private bool   $autoCallbackUrl;
-    private int    $batchRateLimitMs;
+
+    private int $timeout;
+
+    private array $defaults;
+
+    private bool $dbEnabled;
+
+    private bool $autoCallbackUrl;
+
+    private int $batchRateLimitMs;
 
     public function __construct(
         private readonly HttpFactory $http,
@@ -46,12 +52,12 @@ class AsyncDecodoClient
             throw DecodoException::missingToken();
         }
 
-        $this->baseUrl          = rtrim($config['async_base_url'] ?? 'https://scraper-api.decodo.com/v3', '/');
-        $this->timeout          = $config['timeout']              ?? 30;
-        $this->defaults         = $config['defaults']             ?? [];
-        $this->dbEnabled        = $config['database']['enabled']  ?? true;
-        $this->autoCallbackUrl  = $config['webhook']['auto_inject_callback'] ?? true;
-        $this->batchRateLimitMs = $config['batch_rate_limit_ms']  ?? 1_000;
+        $this->baseUrl = rtrim($config['async_base_url'] ?? 'https://scraper-api.decodo.com/v3', '/');
+        $this->timeout = $config['timeout'] ?? 30;
+        $this->defaults = $config['defaults'] ?? [];
+        $this->dbEnabled = $config['database']['enabled'] ?? true;
+        $this->autoCallbackUrl = $config['webhook']['auto_inject_callback'] ?? true;
+        $this->batchRateLimitMs = $config['batch_rate_limit_ms'] ?? 1_000;
     }
 
     // -------------------------------------------------------------------------
@@ -64,18 +70,17 @@ class AsyncDecodoClient
      * When `webhook.auto_inject_callback` is true (default) and no callbackUrl
      * is provided, the package webhook route is used automatically.
      *
-     * @param  string                $url
      * @param  array<string, mixed>  $options
-     * @param  string|null           $callbackUrl  Override the auto-injected URL.
-     * @param  string|null           $passthrough  Echoed back in callback for verification.
-     * @param  \Illuminate\Database\Eloquent\Model|null  $scrapeable  App model to associate.
+     * @param  string|null  $callbackUrl  Override the auto-injected URL.
+     * @param  string|null  $passthrough  Echoed back in callback for verification.
+     * @param  Model|null  $scrapeable  App model to associate.
      */
     public function queueTask(
         string $url,
         array $options = [],
         ?string $callbackUrl = null,
         ?string $passthrough = null,
-        ?\Illuminate\Database\Eloquent\Model $scrapeable = null,
+        ?Model $scrapeable = null,
     ): TaskResponse {
         $resolvedCallback = $callbackUrl ?? $this->resolveCallbackUrl('task');
 
@@ -89,9 +94,9 @@ class AsyncDecodoClient
             $builder->passthrough($passthrough);
         }
 
-        $payload  = $builder->build();
+        $payload = $builder->build();
         $response = $this->post('/task', $payload);
-        $dto      = TaskResponse::fromArray($response);
+        $dto = TaskResponse::fromArray($response);
 
         $this->persistTask($dto, $payload, $options, $resolvedCallback, $passthrough, $scrapeable);
 
@@ -104,11 +109,11 @@ class AsyncDecodoClient
      */
     public function queueTaskWithBuilder(
         PayloadBuilder $builder,
-        ?\Illuminate\Database\Eloquent\Model $scrapeable = null,
+        ?Model $scrapeable = null,
     ): TaskResponse {
-        $payload  = $builder->build();
+        $payload = $builder->build();
         $response = $this->post('/task', $payload);
-        $dto      = TaskResponse::fromArray($response);
+        $dto = TaskResponse::fromArray($response);
 
         $this->persistTask($dto, $payload, [], $dto->callbackUrl, $dto->passthrough, $scrapeable);
 
@@ -122,17 +127,15 @@ class AsyncDecodoClient
      * When `webhook.auto_inject_callback` is true and no callbackUrl is given,
      * the package batch webhook route is injected automatically.
      *
-     * @param  string[]              $urls
+     * @param  string[]  $urls
      * @param  array<string, mixed>  $options
-     * @param  string|null           $callbackUrl  Fired once the whole batch completes.
-     * @param  string|null           $passthrough  Echoed back for batch callback auth.
-     * @param  string|null           $batchName    Optional label for the local batch record.
+     * @param  string|null  $callbackUrl  Fired once the whole batch completes.
+     * @param  string|null  $batchName  Optional label for the local batch record.
      */
     public function queueBatch(
         array $urls,
         array $options = [],
         ?string $callbackUrl = null,
-        ?string $passthrough = null,
         ?string $batchName = null,
     ): BatchTaskResponse {
         $resolvedCallback = $callbackUrl ?? $this->resolveCallbackUrl('batch');
@@ -146,17 +149,12 @@ class AsyncDecodoClient
             $builder->callbackUrl($resolvedCallback);
         }
 
-        if ($passthrough !== null) {
-            $builder->passthrough($passthrough);
-        }
-
-        $payload  = $builder->buildBatch($urls);
+        $payload = $builder->buildBatch($urls);
         $response = $this->post('/task/batch', $payload);
 
-        $items = isset($response[0]) ? $response : [$response];
-        $dto   = BatchTaskResponse::fromArray($items);
+        $dto = BatchTaskResponse::fromArray($response);
 
-        $this->persistBatch($dto, $urls, $options, $resolvedCallback, $passthrough, $batchName);
+        $this->persistBatch($dto, $urls, $options, $resolvedCallback, $batchName);
 
         return $dto;
     }
@@ -172,6 +170,7 @@ class AsyncDecodoClient
     public function getTaskStatus(string $taskId): TaskResponse
     {
         $this->assertTaskId($taskId);
+
         return TaskResponse::fromArray($this->get("/task/{$taskId}"));
     }
 
@@ -210,9 +209,8 @@ class AsyncDecodoClient
      *
      * Prefer callback webhooks in production; polling is for scripts/CLI.
      *
-     * @param  int  $intervalMs   Milliseconds between polls (default 2000).
+     * @param  int  $intervalMs  Milliseconds between polls (default 2000).
      * @param  int  $maxAttempts  Max polling attempts (default 30).
-     *
      * @return Collection<int, ScrapeResult>
      */
     public function pollUntilDone(
@@ -285,7 +283,7 @@ class AsyncDecodoClient
         array $options,
         ?string $callbackUrl,
         ?string $passthrough,
-        ?\Illuminate\Database\Eloquent\Model $scrapeable,
+        ?Model $scrapeable,
         ?int $batchId = null,
     ): void {
         if (! $this->shouldPersist()) {
@@ -293,21 +291,21 @@ class AsyncDecodoClient
         }
 
         $data = [
-            'decodo_task_id'  => $dto->id,
+            'decodo_task_id' => $dto->id,
             'decodo_batch_id' => $batchId,
-            'url'             => $dto->url ?: ($payload['url'] ?? null),
-            'query'           => $payload['query'] ?? null,
-            'status'          => 'pending',
-            'payload'         => $payload,
-            'options'         => $options,
-            'callback_url'    => $callbackUrl,
-            'passthrough'     => $passthrough,
-            'queued_at'       => now(),
+            'url' => $dto->url ?: ($payload['url'] ?? null),
+            'query' => $payload['query'] ?? null,
+            'status' => 'pending',
+            'payload' => $payload,
+            'options' => $options,
+            'callback_url' => $callbackUrl,
+            'passthrough' => $passthrough,
+            'queued_at' => now(),
         ];
 
         if ($scrapeable) {
             $data['scrapeable_type'] = $scrapeable->getMorphClass();
-            $data['scrapeable_id']   = $scrapeable->getKey();
+            $data['scrapeable_id'] = $scrapeable->getKey();
         }
 
         DecodoTask::create($data);
@@ -318,7 +316,6 @@ class AsyncDecodoClient
         array $urls,
         array $options,
         ?string $callbackUrl,
-        ?string $passthrough,
         ?string $batchName,
     ): void {
         if (! $this->shouldPersist()) {
@@ -326,25 +323,24 @@ class AsyncDecodoClient
         }
 
         $batch = DecodoBatch::create([
-            'name'         => $batchName,
-            'total_tasks'  => count($urls),
-            'status'       => 'pending',
+            'name' => $batchName,
+            'total_tasks' => count($urls),
+            'status' => 'pending',
             'callback_url' => $callbackUrl,
-            'passthrough'  => $passthrough,
-            'options'      => $options,
-            'started_at'   => now(),
+            'options' => $options,
+            'started_at' => now(),
         ]);
 
         $dto->tasks->each(function (
-            \Rkdhatterwal\DecodoScraper\DTOs\TaskResponse $task,
+            TaskResponse $task,
             int $index
-        ) use ($batch, $urls, $options, $callbackUrl, $passthrough) {
+        ) use ($batch, $urls, $options, $callbackUrl) {
             $this->persistTask(
                 $task,
                 ['url' => $urls[$index] ?? ''],
                 $options,
                 $callbackUrl,
-                $passthrough,
+                null,
                 null,
                 $batch->id,
             );
@@ -374,7 +370,7 @@ class AsyncDecodoClient
             ->withToken($this->token, 'Basic')
             ->timeout($this->timeout)
             ->acceptJson()
-            ->post($this->baseUrl . $path, $payload);
+            ->post($this->baseUrl.$path, $payload);
 
         if ($response->failed()) {
             throw DecodoException::requestFailed($response->status(), $response->body());
@@ -389,7 +385,7 @@ class AsyncDecodoClient
             ->withToken($this->token, 'Basic')
             ->timeout($this->timeout)
             ->acceptJson()
-            ->get($this->baseUrl . $path);
+            ->get($this->baseUrl.$path);
 
         if ($response->failed()) {
             throw DecodoException::requestFailed($response->status(), $response->body());

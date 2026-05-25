@@ -149,11 +149,34 @@ class PayloadBuilder
     /**
      * Client cookies, e.g. for authenticated page scraping.
      *
-     * @param  array<string, string>  $cookies
+     * Supports:
+     *  - Associative array: ['foo' => 'bar']
+     *  - List of objects with key/value: [['key' => 'foo', 'value' => 'bar']]
+     *  - List of objects with name/value: [['name' => 'foo', 'value' => 'bar']]
      */
     public function cookies(array $cookies): static
     {
-        $this->payload['cookies'] = $cookies;
+        $normalized = [];
+
+        foreach ($cookies as $k => $v) {
+            // Case 1: [['name' => 'foo', 'value' => 'bar']] or [['key' => 'foo', ...]]
+            if (is_array($v) && (isset($v['name']) || isset($v['key']))) {
+                $normalized[] = [
+                    'key'   => (string) ($v['key'] ?? $v['name']),
+                    'value' => (string) ($v['value'] ?? ''),
+                ];
+                continue;
+            }
+
+            // Case 2: ['foo' => 'bar']
+            $normalized[] = [
+                'key'   => (string) $k,
+                'value' => (string) $v,
+            ];
+        }
+
+        $this->payload['cookies'] = $normalized;
+
         return $this;
     }
 

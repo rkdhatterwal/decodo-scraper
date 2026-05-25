@@ -46,6 +46,7 @@ class DecodoWebhookController extends Controller
 
         $decodoTaskId = $payload['id'] ?? null;
         $status       = $payload['status'] ?? null;
+        $passthrough  = $payload['passthrough'] ?? null;
 
         if (! $decodoTaskId || ! $status) {
             DecodoLogger::warning('DecodoWebhook: received malformed task payload.', $payload);
@@ -60,6 +61,12 @@ class DecodoWebhookController extends Controller
             // Log and acknowledge so Decodo doesn't retry.
             DecodoLogger::info("DecodoWebhook: task [{$decodoTaskId}] not found in local DB — acknowledged.");
             return response()->json(['message' => 'Task not tracked locally.']);
+        }
+
+        // Validate passthrough for the specific task/batch if available.
+        if ($task->passthrough && ! hash_equals((string) $task->passthrough, (string) $passthrough)) {
+            DecodoLogger::warning("DecodoWebhook: task [{$decodoTaskId}] passthrough mismatch.");
+            return response()->json(['message' => 'Invalid passthrough.'], 403);
         }
 
         match ($status) {
@@ -129,13 +136,17 @@ class DecodoWebhookController extends Controller
 
         DecodoTaskCompleted::dispatch($task, $payload);
 
-        // If this task belongs to a batch, check whether the batch is now complete.
+        // If this task belongs to a batch, mark it as completed immediately.
         if ($task->decodo_batch_id) {
             $batch = $task->batch;
-            $batch?->recalculateStatus();
-            $batch?->refresh();
 
-            if ($batch && ! $batch->isPending()) {
+            if ($batch && $batch->isPending()) {
+                $batch->update([
+                    'status'       => 'done',
+                    'completed_at' => now(),
+                ]);
+                $batch->refresh();
+
                 DecodoBatchCompleted::dispatch($batch);
             }
         }
@@ -150,10 +161,14 @@ class DecodoWebhookController extends Controller
         // Same batch-completion check on fault.
         if ($task->decodo_batch_id) {
             $batch = $task->batch;
-            $batch?->recalculateStatus();
-            $batch?->refresh();
 
-            if ($batch && ! $batch->isPending()) {
+            if ($batch && $batch->isPending()) {
+                $batch->update([
+                    'status'       => 'faulted',
+                    'completed_at' => now(),
+                ]);
+                $batch->refresh();
+
                 DecodoBatchCompleted::dispatch($batch);
             }
         }
