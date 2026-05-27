@@ -169,46 +169,6 @@ describe('DecodoWebhookController — task', function () {
     });
 });
 
-// ---------------------------------------------------------------------------
-// Batch webhook tests
-// ---------------------------------------------------------------------------
-
-describe('DecodoWebhookController — batch', function () {
-
-    beforeEach(fn () => Event::fake());
-
-    it('acknowledges when batch is not found by passthrough', function () {
-        $this->postJson(route('decodo.webhook.batch'), ['passthrough' => 'unknown'])
-            ->assertOk()
-            ->assertJson(['message' => 'Batch not tracked locally.']);
-
-        Event::assertNotDispatched(DecodoBatchCompleted::class);
-    });
-
-    it('fires DecodoBatchCompleted when all tasks are done', function () {
-        $batch = createBatch(['passthrough' => 'batch-secret']);
-        createTask(['decodo_task_id' => 'task-a', 'decodo_batch_id' => $batch->id, 'status' => 'done']);
-        createTask(['decodo_task_id' => 'task-b', 'decodo_batch_id' => $batch->id, 'status' => 'done']);
-
-        $this->postJson(route('decodo.webhook.batch'), ['passthrough' => 'batch-secret'])
-            ->assertOk();
-
-        $batch->refresh();
-        expect($batch->status)->toBe('done');
-        Event::assertDispatched(DecodoBatchCompleted::class);
-    });
-
-    it('does not fire DecodoBatchCompleted while tasks are still pending', function () {
-        $batch = createBatch(['passthrough' => 'batch-secret']);
-        createTask(['decodo_task_id' => 'task-a', 'decodo_batch_id' => $batch->id, 'status' => 'done']);
-        createTask(['decodo_task_id' => 'task-b', 'decodo_batch_id' => $batch->id, 'status' => 'pending']);
-
-        $this->postJson(route('decodo.webhook.batch'), ['passthrough' => 'batch-secret'])
-            ->assertOk();
-
-        Event::assertNotDispatched(DecodoBatchCompleted::class);
-    });
-});
 
 // ---------------------------------------------------------------------------
 // Middleware tests

@@ -6,6 +6,27 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-05-27
+### Added
+- `AsyncDecodoClient` and `DecodoAsync` facade for v3 Asynchronous API support.
+- `PayloadBuilder` for fluent and expressive request configuration.
+- Database tracking for async tasks and batches with `DecodoTask` and `DecodoBatch` models.
+- Database migrations for task and batch persistence.
+- Result caching via `DecodoResultCache`.
+- Webhook support with automatic route registration and callback URL injection.
+- New events: `DecodoTaskCompleted`, `DecodoTaskFaulted`, `DecodoTaskExpired`, and `DecodoBatchCompleted`.
+- Artisan commands: `decodo:status`, `decodo:retry`, and `decodo:prune`.
+- Automatic pruning of old records via scheduled task.
+- New `DecodoClient` methods: `screenshot()`, `scrapeAsMarkdown()`, and `scrapeWithParser()`.
+- `DecodoFake` testing helper for mocking API responses.
+- `TaskResponse` and `BatchTaskResponse` DTOs.
+- Support for custom headers, cookies, and HTTP methods in requests.
+- Rate-limit protection for batch task submissions.
+
+### Improved
+- `DecodoClient` now uses `PayloadBuilder` internally for better consistency.
+- Enhanced exception handling with more descriptive error messages.
+
 ## [1.0.0] - 2025-05-19
 ### Added
 - Initial release

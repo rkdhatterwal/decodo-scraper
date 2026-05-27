@@ -138,7 +138,7 @@ class AsyncDecodoClient
         ?string $callbackUrl = null,
         ?string $batchName = null,
     ): BatchTaskResponse {
-        $resolvedCallback = $callbackUrl ?? $this->resolveCallbackUrl('batch');
+        $resolvedCallback = $callbackUrl ?? $this->resolveCallbackUrl('task');
 
         // Enforce Decodo's 1 req/sec rate limit for batch submissions.
         BatchRateLimiter::throttle($this->batchRateLimitMs);

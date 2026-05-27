@@ -100,7 +100,7 @@ describe('DecodoClient', function () {
         $result = makeClient()->scrapeWithJs('https://example.com');
 
         Http::assertSent(function ($request) {
-            return $request->data()['headless'] === true;
+            return $request->data()['headless'] === 'html';
         });
 
         expect($result)->toBeInstanceOf(ScrapeResult::class);

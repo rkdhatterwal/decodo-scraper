@@ -27,12 +27,7 @@ class RetryDecodoTasks extends Command
 
     protected $description = 'Re-queue faulted or stuck-pending Decodo tasks via the async API';
 
-    public function __construct(private readonly AsyncDecodoClient $client)
-    {
-        parent::__construct();
-    }
-
-    public function handle(): int
+    public function handle(AsyncDecodoClient $client): int
     {
         $dryRun = (bool) $this->option('dry-run');
 
@@ -63,7 +58,7 @@ class RetryDecodoTasks extends Command
             }
 
             try {
-                $response = $this->client->queueTask(
+                $response = $client->queueTask(
                     url:         $task->url ?? '',
                     options:     $task->options ?? [],
                     callbackUrl: $task->callback_url,

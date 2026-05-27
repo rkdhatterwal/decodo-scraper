@@ -191,16 +191,16 @@ return [
     */
 
     'defaults' => [
-        'proxy_pool'  => 'premium',
-        'headless'    => null,
-        'geo'         => null,
-        'domain'      => 'com',
-        'locale'      => null,
-        'device_type' => 'desktop',
-        'markdown'    => false,
-        'parse'       => false,
-        'headers'     => [],
-        'cookies'     => [],
+        'proxy_pool' => env('DECODO_PROXY_POOL', 'premium'),
+        'headless' => env('DECODO_HEADLESS'),
+        'geo' => env('DECODO_GEO'),
+        'domain' => env('DECODO_DOMAIN', 'com'),
+        'locale' => env('DECODO_LOCALE'),
+        'device_type' => env('DECODO_DEVICE_TYPE', 'desktop'),
+        'markdown' => env('DECODO_MARKDOWN', false),
+        'parse' => env('DECODO_PARSE', false),
+        'headers' => [],
+        'cookies' => [],
     ],
 
 ];

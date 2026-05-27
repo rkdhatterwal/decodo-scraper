@@ -6,8 +6,8 @@ A clean, well-tested Laravel wrapper for the [Decodo Web Scraping API](https://d
 
 ## Requirements
 
-- PHP 8.2+
-- Laravel 11 or 12
+- PHP 8.1+
+- Laravel 10, 11, 12, or 13
 
 ## Installation
 
@@ -15,10 +15,12 @@ A clean, well-tested Laravel wrapper for the [Decodo Web Scraping API](https://d
 composer require rkdhatterwal/decodo-scraper
 ```
 
-Publish the config file:
+Publish the config and migrations:
 
 ```bash
 php artisan vendor:publish --tag=decodo-config
+php artisan vendor:publish --tag=decodo-migrations
+php artisan migrate
 ```
 
 Add credentials to `.env`:
@@ -84,6 +86,26 @@ $results = Decodo::send(
 
 ---
 
+## Database Tracking
+
+When `database.enabled` is true (default), the package automatically tracks every async task and batch in your database using the `decodo_tasks` and `decodo_batches` tables.
+
+### Models
+- `Rkdhatterwal\DecodoScraper\Models\DecodoTask`
+- `Rkdhatterwal\DecodoScraper\Models\DecodoBatch`
+
+You can associate a task with one of your own models (e.g., a `Product` or `Lead`) by passing it to `queueTask`:
+
+```php
+$product = Product::find(1);
+DecodoAsync::queueTask('https://example.com', scrapeable: $product);
+
+// Later retrieve it
+$task = $product->decodoTasks()->latest()->first();
+```
+
+---
+
 ## Async Scraping (v3)
 
 Use the `DecodoAsync` facade or inject `AsyncDecodoClient`.
@@ -108,6 +130,8 @@ $task = DecodoAsync::queueTask(
 ```
 
 ### Queue a batch
+
+Decodo enforces a 1-request-per-second rate limit on batch submissions. The package handles this for you automatically.
 
 ```php
 $batch = DecodoAsync::queueBatch(
@@ -136,6 +160,61 @@ $result  = DecodoAsync::getFirstTaskResult($task->id);  // ScrapeResult
 // Convenience: poll and block until done (for scripts/queues)
 $results = DecodoAsync::pollUntilDone($task->id, intervalMs: 2000, maxAttempts: 30);
 ```
+
+---
+
+## Webhooks
+
+The package includes a built-in webhook handler that automatically updates your local database records when Decodo tasks complete.
+
+### Setup
+1. Ensure `webhook.enabled` is `true` in your config.
+2. Exempt the webhook path from CSRF protection in `app/Http/Middleware/VerifyCsrfToken.php` (Laravel 10) or your `bootstrap/app.php` (Laravel 11+):
+   ```php
+   'decodo/webhook/*'
+   ```
+
+### Automatic Injection
+When `webhook.auto_inject_callback` is enabled, the package will automatically append the correct `callback_url` to every async request. You don't need to pass it manually unless you want to override it.
+
+---
+
+## Result Caching
+
+To avoid redundant API calls and save credits, enable the `DecodoResultCache`. It caches results for "done" tasks (which are immutable) for up to 23 hours.
+
+```php
+'cache' => [
+    'enabled' => true,
+    'ttl' => 82800,
+],
+```
+
+---
+
+## Events
+
+You can listen for the following events to trigger your own logic:
+
+- `Rkdhatterwal\DecodoScraper\Events\DecodoTaskCompleted`
+- `Rkdhatterwal\DecodoScraper\Events\DecodoTaskFaulted`
+- `Rkdhatterwal\DecodoScraper\Events\DecodoTaskExpired`
+- `Rkdhatterwal\DecodoScraper\Events\DecodoBatchCompleted`
+
+```php
+// Example: notify when a batch finishes
+Event::listen(DecodoBatchCompleted::class, function ($event) {
+    Log::info("Batch {$event->batch->id} is done!");
+});
+```
+
+---
+
+## Artisan Commands
+
+- `php artisan decodo:status {taskId}` — Check the status of a specific task.
+- `php artisan decodo:retry {taskId}` — Retry a faulted task.
+- `php artisan decodo:prune` — Clean up old database records (scheduled daily by default).
 
 ---
 
@@ -203,11 +282,31 @@ See the [Decodo parameters docs](https://help.decodo.com/docs/web-scraping-api-p
 
 ## Testing
 
-```bash
-composer test
+The package provides a powerful `DecodoFake` helper to mock API responses and assert that requests were sent.
+
+```php
+use Rkdhatterwal\DecodoScraper\Testing\DecodoFake;
+
+$fake = DecodoFake::make()->swap();
+
+// Stub a response
+$fake->fakeScrape('<html>Hello World</html>');
+
+// Act
+$result = Decodo::scrape('https://example.com');
+
+// Assert
+$fake->assertScraped('https://example.com');
+$this->assertEquals('<html>Hello World</html>', $result->content);
 ```
 
-All tests use `Http::fake()` — no live requests are made.
+For async tasks:
+```php
+$fake->fakeTask('task-123');
+DecodoAsync::queueTask('https://example.com');
+
+$fake->assertTaskQueued('https://example.com');
+```
 
 ---
 

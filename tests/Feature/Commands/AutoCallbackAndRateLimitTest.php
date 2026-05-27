@@ -52,6 +52,8 @@ describe('Auto callback URL injection', function () {
 
     it('skips injection when auto_inject_callback is disabled', function () {
         config(['decodo.webhook.auto_inject_callback' => false]);
+        app()->forgetInstance(\Rkdhatterwal\DecodoScraper\AsyncDecodoClient::class);
+        app()->forgetInstance('decodo.async');
 
         Http::fake(['*/task' => Http::response([
             'id' => 'no-cb-task', 'status' => 'pending', 'url' => 'https://example.com',
@@ -83,7 +85,7 @@ describe('Auto callback URL injection', function () {
         Http::assertSent(function ($request) {
             $data = $request->data();
             return isset($data['callback_url'])
-                && str_contains($data['callback_url'], 'decodo/webhook/batch');
+                && str_contains($data['callback_url'], 'decodo/webhook/task');
         });
     });
 });

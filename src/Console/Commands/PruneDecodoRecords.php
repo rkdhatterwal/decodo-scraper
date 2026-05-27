@@ -76,6 +76,7 @@ class PruneDecodoRecords extends Command
         $cutoff = now()->subDays($days);
 
         $count = DecodoTask::whereNotNull('result_content')
+            ->whereNotNull('completed_at')
             ->where('completed_at', '<', $cutoff)
             ->count();
 
@@ -91,6 +92,7 @@ class PruneDecodoRecords extends Command
         $nullified = 0;
         do {
             $affected = DecodoTask::whereNotNull('result_content')
+                ->whereNotNull('completed_at')
                 ->where('completed_at', '<', $cutoff)
                 ->limit($chunk)
                 ->update(['result_content' => null]);

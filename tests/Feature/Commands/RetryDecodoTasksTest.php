@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Http;
 use Rkdhatterwal\DecodoScraper\Models\DecodoTask;
+use Rkdhatterwal\DecodoScraper\Testing\DecodoFake;
 
 function faultedTask(array $attrs = []): DecodoTask
 {
@@ -19,16 +20,7 @@ describe('decodo:retry', function () {
     beforeEach(fn () => Http::preventStrayRequests());
 
     it('re-queues faulted tasks and updates their status to pending', function () {
-        Http::fake([
-            '*/task' => Http::response([
-                'id' => 'new-task-id', 'status' => 'pending',
-                'url' => 'https://example.com', 'created_at' => now()->toDateTimeString(),
-                'updated_at' => now()->toDateTimeString(), 'device_type' => 'desktop',
-                'parse' => false, 'force_headers' => false, 'force_cookies' => false,
-                'domain' => 'com', 'http_method' => 'get', 'headers' => [], 'cookies' => [],
-                'successful_status_codes' => [],
-            ]),
-        ]);
+        DecodoFake::make()->fakeTask('new-task-id')->swap();
 
         $task = faultedTask();
 
@@ -42,13 +34,7 @@ describe('decodo:retry', function () {
     });
 
     it('retries only tasks matching the --status option', function () {
-        Http::fake(['*/task' => Http::response([
-            'id' => 'new-pending-id', 'status' => 'pending', 'url' => '',
-            'created_at' => now()->toDateTimeString(), 'updated_at' => now()->toDateTimeString(),
-            'device_type' => 'desktop', 'parse' => false, 'force_headers' => false,
-            'force_cookies' => false, 'domain' => 'com', 'http_method' => 'get',
-            'headers' => [], 'cookies' => [], 'successful_status_codes' => [],
-        ])]);
+        DecodoFake::make()->fakeTask('new-pending-id')->swap();
 
         $stuckPending = DecodoTask::create([
             'decodo_task_id' => 'stuck-001', 'url' => 'https://example.com',
@@ -66,13 +52,7 @@ describe('decodo:retry', function () {
     });
 
     it('retries a specific task by --id', function () {
-        Http::fake(['*/task' => Http::response([
-            'id' => 'retried-specific', 'status' => 'pending', 'url' => 'https://example.com',
-            'created_at' => now()->toDateTimeString(), 'updated_at' => now()->toDateTimeString(),
-            'device_type' => 'desktop', 'parse' => false, 'force_headers' => false,
-            'force_cookies' => false, 'domain' => 'com', 'http_method' => 'get',
-            'headers' => [], 'cookies' => [], 'successful_status_codes' => [],
-        ])]);
+        DecodoFake::make()->fakeTask('retried-specific')->swap();
 
         $task = faultedTask(['decodo_task_id' => 'target-task-001']);
         $other = faultedTask(['decodo_task_id' => 'other-task-002']);
@@ -84,13 +64,7 @@ describe('decodo:retry', function () {
     });
 
     it('respects the --limit option', function () {
-        Http::fake(['*/task' => Http::response([
-            'id' => uniqid('new-'), 'status' => 'pending', 'url' => '',
-            'created_at' => now()->toDateTimeString(), 'updated_at' => now()->toDateTimeString(),
-            'device_type' => 'desktop', 'parse' => false, 'force_headers' => false,
-            'force_cookies' => false, 'domain' => 'com', 'http_method' => 'get',
-            'headers' => [], 'cookies' => [], 'successful_status_codes' => [],
-        ])]);
+        DecodoFake::make()->fakeTask('new-id')->swap();
 
         faultedTask(); faultedTask(); faultedTask();
 

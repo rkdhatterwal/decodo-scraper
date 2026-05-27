@@ -23,12 +23,7 @@ class DecodoStatus extends Command
 
     protected $description = 'Inspect the status and details of a Decodo async task';
 
-    public function __construct(private readonly AsyncDecodoClient $client)
-    {
-        parent::__construct();
-    }
-
-    public function handle(): int
+    public function handle(AsyncDecodoClient $client): int
     {
         $taskId  = $this->argument('id');
         $apiOnly = (bool) $this->option('api-only');
@@ -44,7 +39,7 @@ class DecodoStatus extends Command
         }
 
         // ---- Live API status ------------------------------------------------
-        $this->showApiStatus($taskId);
+        $this->showApiStatus($client, $taskId);
 
         return self::SUCCESS;
     }
@@ -87,12 +82,12 @@ class DecodoStatus extends Command
         $this->newLine();
     }
 
-    private function showApiStatus(string $taskId): void
+    private function showApiStatus(AsyncDecodoClient $client, string $taskId): void
     {
         $this->components->info('─── Live API Status ───');
 
         try {
-            $status      = $this->client->getTaskStatus($taskId);
+            $status      = $client->getTaskStatus($taskId);
             $statusColor = match ($status->status) {
                 'done'    => 'info',
                 'faulted' => 'error',

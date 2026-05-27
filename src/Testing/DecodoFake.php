@@ -44,20 +44,20 @@ use Rkdhatterwal\DecodoScraper\Exceptions\DecodoException;
 class DecodoFake
 {
     // ---- Recorded calls ----------------------------------------------------
-    private array $scrapes         = [];
-    private array $queuedTasks     = [];
-    private array $queuedBatches   = [];
-    private array $statusChecks    = [];
-    private array $resultFetches   = [];
+    public array $scrapes         = [];
+    public array $queuedTasks     = [];
+    public array $queuedBatches   = [];
+    public array $statusChecks    = [];
+    public array $resultFetches   = [];
 
     // ---- Stubbed responses -------------------------------------------------
-    private array $scrapeResponses       = [];
-    private array $taskResponses         = [];
-    private array $batchResponses        = [];
-    private array $statusResponses       = [];
-    private array $resultResponses       = [];
+    public array $scrapeResponses       = [];
+    public array $taskResponses         = [];
+    public array $batchResponses        = [];
+    public array $statusResponses       = [];
+    public array $resultResponses       = [];
 
-    private bool $failOnUnstubbed = false;
+    public bool $failOnUnstubbed = false;
 
     // =========================================================================
     // Factory
@@ -350,7 +350,7 @@ class DecodoFake
     // Response pop/peek helpers
     // =========================================================================
 
-    private function popScrapeResponse(array $urls): Collection
+    public function popScrapeResponse(array $urls): Collection
     {
         if (! empty($this->scrapeResponses)) {
             $data = array_shift($this->scrapeResponses);
@@ -364,7 +364,7 @@ class DecodoFake
         return collect([ScrapeResult::fromArray($this->makeResult('<html></html>', 200, '', $urls[0] ?? ''))]);
     }
 
-    private function popTaskResponse(string $url): array
+    public function popTaskResponse(string $url): array
     {
         if (! empty($this->taskResponses)) {
             return array_shift($this->taskResponses);
@@ -377,7 +377,7 @@ class DecodoFake
         return $this->makeTaskData('fake-task-' . uniqid(), 'pending', $url);
     }
 
-    private function popBatchResponse(array $urls): BatchTaskResponse
+    public function popBatchResponse(array $urls): BatchTaskResponse
     {
         if (! empty($this->batchResponses)) {
             $ids   = array_shift($this->batchResponses);
@@ -393,7 +393,7 @@ class DecodoFake
         return BatchTaskResponse::fromArray($tasks);
     }
 
-    private function getStatusResponse(string $taskId): array
+    public function getStatusResponse(string $taskId): array
     {
         if (isset($this->statusResponses[$taskId])) {
             return $this->statusResponses[$taskId];
@@ -406,10 +406,12 @@ class DecodoFake
         return $this->makeTaskData($taskId, 'done');
     }
 
-    private function getResultResponse(string $taskId): Collection
+    public function getResultResponse(string $taskId): Collection
     {
         if (isset($this->resultResponses[$taskId])) {
-            return $this->resultResponses[$taskId];
+            $responses = $this->resultResponses[$taskId];
+
+            return collect($responses)->map(fn ($r) => is_array($r) ? ScrapeResult::fromArray($r) : $r);
         }
 
         if ($this->failOnUnstubbed) {
@@ -423,7 +425,7 @@ class DecodoFake
     // Data builders
     // =========================================================================
 
-    private function makeResult(string $content, int $statusCode, string $taskId = '', string $url = 'https://example.com'): array
+    public function makeResult(string $content, int $statusCode, string $taskId = '', string $url = 'https://example.com'): array
     {
         return [
             'content'     => $content,
@@ -435,7 +437,7 @@ class DecodoFake
         ];
     }
 
-    private function makeTaskData(string $taskId, string $status = 'pending', string $url = 'https://example.com'): array
+    public function makeTaskData(string $taskId, string $status = 'pending', string $url = 'https://example.com'): array
     {
         return [
             'id'                      => $taskId,

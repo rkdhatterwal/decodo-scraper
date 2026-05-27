@@ -15,7 +15,6 @@ use Rkdhatterwal\DecodoScraper\Http\Middleware\VerifyDecodoWebhook;
 | Decodo will POST to these URLs once an async task completes:
 |
 |   Task callback:   POST {prefix}/task
-|   Batch callback:  POST {prefix}/batch
 |
 | The prefix defaults to "decodo/webhook" and is configurable via:
 |   config('decodo.webhook.path')
@@ -30,11 +29,10 @@ use Rkdhatterwal\DecodoScraper\Http\Middleware\VerifyDecodoWebhook;
 */
 
 Route::prefix(config('decodo.webhook.path', 'decodo/webhook'))
-    ->middleware(array_filter([
+    ->middleware(array_filter(array: [
         'api',
-        config('decodo.webhook.verify_passthrough') ? VerifyDecodoWebhook::class : null,
+        VerifyDecodoWebhook::class,
     ]))
     ->group(function () {
         Route::post('task',  [DecodoWebhookController::class, 'handleTask'])->name('decodo.webhook.task');
-        Route::post('batch', [DecodoWebhookController::class, 'handleBatch'])->name('decodo.webhook.batch');
     });

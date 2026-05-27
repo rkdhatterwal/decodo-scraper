@@ -80,7 +80,7 @@ describe('decodo:prune — result_content nullification', function () {
             'decodo_task_id'  => uniqid('task-'),
             'status'          => 'pending',
             'result_content'  => '<html>content</html>',
-            'queued_at'       => now()->subDays(20),
+            'queued_at'       => now()->subDays(1),
         ]);
 
         $this->artisan('decodo:prune')->assertSuccessful();

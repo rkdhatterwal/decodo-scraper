@@ -5,11 +5,11 @@ namespace Rkdhatterwal\DecodoScraper\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Rkdhatterwal\DecodoScraper\AsyncDecodoClient;
 use Rkdhatterwal\DecodoScraper\DecodoLogger;
 use Rkdhatterwal\DecodoScraper\Events\DecodoBatchCompleted;
 use Rkdhatterwal\DecodoScraper\Events\DecodoTaskCompleted;
 use Rkdhatterwal\DecodoScraper\Events\DecodoTaskFaulted;
-use Rkdhatterwal\DecodoScraper\Models\DecodoBatch;
 use Rkdhatterwal\DecodoScraper\Models\DecodoTask;
 
 /**
@@ -19,8 +19,7 @@ use Rkdhatterwal\DecodoScraper\Models\DecodoTask;
  * The body contains the task ID and status; use the task ID to fetch results.
  *
  * Two routes are registered (see routes/decodo.php):
- *   POST /decodo/webhook/task    — single task callback
- *   POST /decodo/webhook/batch   — batch completion callback
+ *   POST /decodo/webhook/task    — task callback
  */
 class DecodoWebhookController extends Controller
 {
@@ -33,9 +32,8 @@ class DecodoWebhookController extends Controller
      *
      * Decodo POSTs:
      * {
-     *   "id": "7039164056019693569",
-     *   "status": "done",
-     *   "url": "https://example.com",
+     *   "task_id": "7465383408571557890",
+     *   "status_code": 200,
      *   "passthrough": "your-secret",
      *   ...
      * }
@@ -44,16 +42,21 @@ class DecodoWebhookController extends Controller
     {
         $payload = $request->all();
 
-        $decodoTaskId = $payload['id'] ?? null;
-        $status       = $payload['status'] ?? null;
+        $decodoTaskId = $payload['task_id'] ?? null;
+        $status       = $payload['status_code'] ?? null;
         $passthrough  = $payload['passthrough'] ?? null;
 
-        if (! $decodoTaskId || ! $status) {
+        if (! $decodoTaskId || is_null($status)) {
             DecodoLogger::warning('DecodoWebhook: received malformed task payload.', $payload);
             return response()->json(['message' => 'Missing id or status.'], 422);
         }
 
-        // Find the locally-tracked task record.
+        // If status is a numeric status code (new format), map it to internal status strings.
+        if (is_numeric($status)) {
+            $status = ($status >= 200 && $status < 300) ? 'done' : 'faulted';
+        }
+
+        // Find the locally tracked task record.
         $task = DecodoTask::where('decodo_task_id', $decodoTaskId)->first();
 
         if (! $task) {
@@ -78,47 +81,6 @@ class DecodoWebhookController extends Controller
         return response()->json(['message' => 'OK']);
     }
 
-    // -------------------------------------------------------------------------
-    // Batch webhook
-    // -------------------------------------------------------------------------
-
-    /**
-     * Handle a batch completion callback.
-     *
-     * Decodo fires this after the last task in the batch finishes.
-     * We recalculate the aggregate batch status and fire DecodoBatchCompleted.
-     *
-     * Note: individual task webhooks arrive separately via handleTask().
-     * This endpoint is for the batch-level notification.
-     */
-    public function handleBatch(Request $request): JsonResponse
-    {
-        $payload = $request->all();
-
-        $passthrough = $payload['passthrough'] ?? null;
-
-        // Locate the batch by its passthrough token (the most reliable
-        // correlation key since batches don't have a single Decodo task_id).
-        $batch = $passthrough
-            ? DecodoBatch::where('passthrough', $passthrough)->first()
-            : null;
-
-        if (! $batch) {
-            DecodoLogger::info('DecodoWebhook: batch not found by passthrough — acknowledged.', $payload);
-            return response()->json(['message' => 'Batch not tracked locally.']);
-        }
-
-        // Recompute aggregate status from child tasks.
-        $batch->recalculateStatus();
-        $batch->refresh();
-
-        // Only fire the event when the batch has truly finished (not still pending).
-        if (! $batch->isPending()) {
-            DecodoBatchCompleted::dispatch($batch);
-        }
-
-        return response()->json(['message' => 'OK']);
-    }
 
     // -------------------------------------------------------------------------
     // Internals
@@ -136,20 +98,8 @@ class DecodoWebhookController extends Controller
 
         DecodoTaskCompleted::dispatch($task, $payload);
 
-        // If this task belongs to a batch, mark it as completed immediately.
-        if ($task->decodo_batch_id) {
-            $batch = $task->batch;
-
-            if ($batch && $batch->isPending()) {
-                $batch->update([
-                    'status'       => 'done',
-                    'completed_at' => now(),
-                ]);
-                $batch->refresh();
-
-                DecodoBatchCompleted::dispatch($batch);
-            }
-        }
+        // If this task belongs to a batch, recalculate the batch status.
+        $this->updateBatchStatus($task);
     }
 
     private function handleTaskFaulted(DecodoTask $task, array $payload): void
@@ -158,20 +108,8 @@ class DecodoWebhookController extends Controller
 
         DecodoTaskFaulted::dispatch($task, $payload);
 
-        // Same batch-completion check on fault.
-        if ($task->decodo_batch_id) {
-            $batch = $task->batch;
-
-            if ($batch && $batch->isPending()) {
-                $batch->update([
-                    'status'       => 'faulted',
-                    'completed_at' => now(),
-                ]);
-                $batch->refresh();
-
-                DecodoBatchCompleted::dispatch($batch);
-            }
-        }
+        // If this task belongs to a batch, recalculate the batch status.
+        $this->updateBatchStatus($task);
     }
 
     /**
@@ -180,7 +118,7 @@ class DecodoWebhookController extends Controller
     private function fetchTaskResult(string $decodoTaskId): array
     {
         try {
-            /** @var \Rkdhatterwal\DecodoScraper\AsyncDecodoClient $client */
+            /** @var AsyncDecodoClient $client */
             $client  = app('decodo.async');
             $results = $client->getTaskResults($decodoTaskId);
 
@@ -188,6 +126,27 @@ class DecodoWebhookController extends Controller
         } catch (\Throwable $e) {
             DecodoLogger::error("DecodoWebhook: failed to fetch result for task [{$decodoTaskId}]: {$e->getMessage()}");
             return [];
+        }
+    }
+
+    /**
+     * @param  DecodoTask  $task
+     * @return void
+     */
+    private function updateBatchStatus(DecodoTask $task): void
+    {
+        if ($task->decodo_batch_id) {
+            $batch = $task->batch;
+
+            if ($batch && $batch->isPending()) {
+                $batch->recalculateStatus();
+                $batch->refresh();
+
+                // Only fire the event when the batch has truly finished.
+                if (!$batch->isPending()) {
+                    DecodoBatchCompleted::dispatch($batch);
+                }
+            }
         }
     }
 }
