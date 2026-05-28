@@ -161,6 +161,15 @@ $result  = DecodoAsync::getFirstTaskResult($task->id);  // ScrapeResult
 $results = DecodoAsync::pollUntilDone($task->id, intervalMs: 2000, maxAttempts: 30);
 ```
 
+### v3 Batch Format
+Decodo v3 supports passing an array of URLs in a single request. The package handles this via `queueBatch` or by passing URLs to `buildBatch()` in the `PayloadBuilder`:
+
+```php
+$payload = (new PayloadBuilder())
+    ->geo('United States')
+    ->buildBatch(['https://site1.com', 'https://site2.com']);
+```
+
 ---
 
 ## Webhooks
@@ -218,7 +227,11 @@ Event::listen(DecodoBatchCompleted::class, function ($event) {
 
 ---
 
-## ScrapeResult DTO
+## DTOs & Public Properties
+
+All DTOs in this package use PHP 8.1+ `public readonly` properties for a better developer experience. You can access properties directly: `echo $result->content;`.
+
+### ScrapeResult DTO
 
 | Property     | Type     | Description                           |
 |--------------|----------|---------------------------------------|
@@ -234,9 +247,9 @@ $result->isSuccessful(); // true when statusCode is 2xx
 $result->toArray();
 ```
 
-## TaskResponse DTO
+### TaskResponse DTO
 
-Returned by `queueTask()`, `queueBatch()`, `getTaskStatus()`.
+Returned by `queueTask()` and `getTaskStatus()`.
 
 ```php
 $task->id;          // Task ID for later retrieval
@@ -245,6 +258,18 @@ $task->isPending(); // bool
 $task->isDone();    // bool
 $task->isFaulted(); // bool
 $task->toArray();
+```
+
+### BatchTaskResponse DTO
+
+Returned by `queueBatch()`.
+
+```php
+$batch->id;         // Batch ID (v3)
+$batch->tasks;      // Collection of TaskResponse DTOs
+$batch->ids();       // Collection of task IDs
+$batch->count();    // Total task count
+$batch->toArray();
 ```
 
 ---
@@ -306,6 +331,14 @@ $fake->fakeTask('task-123');
 DecodoAsync::queueTask('https://example.com');
 
 $fake->assertTaskQueued('https://example.com');
+```
+
+For batches:
+```php
+$fake->fakeBatch(['task-1', 'task-2']);
+DecodoAsync::queueBatch(['https://a.com', 'https://b.com']);
+
+$fake->assertBatchQueued(2); // asserts batch with 2 URLs was queued
 ```
 
 ---

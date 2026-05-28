@@ -320,7 +320,10 @@ class PayloadBuilder
     public function build(): array
     {
         $this->validate();
-        return $this->payload;
+
+        $payload = $this->applyPremiumDomainDetection($this->payload, $this->payload['url'] ?? null);
+
+        return $this->applyStandardPoolFiltering($payload);
     }
 
     /**
@@ -344,7 +347,9 @@ class PayloadBuilder
         unset($base['url'], $base['query']);
         $base['url'] = $urls;
 
-        return $base;
+        $base = $this->applyPremiumDomainDetection($base, $urls);
+
+        return $this->applyStandardPoolFiltering($base);
     }
 
     /**
@@ -390,6 +395,87 @@ class PayloadBuilder
         }
 
         return $builder;
+    }
+
+    /**
+     * Apply filtering for standard proxy pool.
+     */
+    private function applyStandardPoolFiltering(array $payload): array
+    {
+        if (($payload['proxy_pool'] ?? '') === 'standard') {
+            $allowed = ['proxy_pool', 'url', 'headless', 'geo'];
+
+            if (($payload['http_method'] ?? 'get') === 'post') {
+                $allowed[] = 'http_method';
+                $allowed[] = 'payload';
+            }
+
+            return array_intersect_key($payload, array_flip($allowed));
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Apply domain auto-detection for premium proxy pool.
+     */
+    private function applyPremiumDomainDetection(array $payload, string|array|null $urls): array
+    {
+        if (($payload['proxy_pool'] ?? 'premium') !== 'premium') {
+            return $payload;
+        }
+
+        if (empty($urls)) {
+            return $payload;
+        }
+
+        if (is_string($urls)) {
+            $tld = $this->extractTld($urls);
+            if ($tld) {
+                $payload['domain'] = $tld;
+            }
+        } elseif (is_array($urls)) {
+            $tlds = array_unique(array_filter(array_map([$this, 'extractTld'], $urls)));
+            if (count($tlds) === 1) {
+                $payload['domain'] = reset($tlds);
+            } else {
+                unset($payload['domain']);
+            }
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Extract the TLD from a URL.
+     */
+    private function extractTld(string $url): ?string
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+        if (! $host) {
+            return null;
+        }
+
+        $parts = explode('.', $host);
+        $count = count($parts);
+
+        if ($count < 2) {
+            return null;
+        }
+
+        // Check for common multi-part TLDs like .co.uk, .com.au, etc.
+        if ($count >= 3) {
+            $last = $parts[$count - 1];
+            $penultimate = $parts[$count - 2];
+
+            // Common 2nd level TLDs that precede a country code
+            $common2ndLevel = ['com', 'co', 'net', 'org', 'gov', 'edu', 'ac', 'biz', 'info'];
+            if (strlen($last) === 2 && in_array($penultimate, $common2ndLevel)) {
+                return $penultimate . '.' . $last;
+            }
+        }
+
+        return $parts[$count - 1];
     }
 
     private function validate(): void
