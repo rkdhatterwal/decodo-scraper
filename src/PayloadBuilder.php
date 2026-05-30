@@ -2,6 +2,7 @@
 
 namespace Rkdhatterwal\DecodoScraper;
 
+use InvalidArgumentException;
 use Rkdhatterwal\DecodoScraper\Exceptions\DecodoException;
 
 /**
@@ -46,7 +47,7 @@ class PayloadBuilder
     public function query(string $query): static
     {
         if (empty(trim($query))) {
-            throw new \InvalidArgumentException('Query cannot be empty.');
+            throw new InvalidArgumentException('Query cannot be empty.');
         }
 
         unset($this->payload['url']);
@@ -75,7 +76,7 @@ class PayloadBuilder
     public function proxyPool(string $pool): static
     {
         if (! in_array(strtolower($pool), self::VALID_PROXY_POOLS, true)) {
-            throw new \InvalidArgumentException(
+            throw new InvalidArgumentException(
                 'Invalid proxy_pool. Allowed: ' . implode(', ', self::VALID_PROXY_POOLS)
             );
         }
@@ -90,7 +91,7 @@ class PayloadBuilder
     public function headless(string $mode = 'html'): static
     {
         if (! in_array(strtolower($mode), self::VALID_HEADLESS, true)) {
-            throw new \InvalidArgumentException(
+            throw new InvalidArgumentException(
                 'Invalid headless mode. Allowed: ' . implode(', ', self::VALID_HEADLESS)
             );
         }
@@ -195,7 +196,7 @@ class PayloadBuilder
     public function deviceType(string $type): static
     {
         if (! in_array(strtolower($type), self::VALID_DEVICE_TYPES, true)) {
-            throw new \InvalidArgumentException(
+            throw new InvalidArgumentException(
                 'Invalid device_type. Allowed: ' . implode(', ', self::VALID_DEVICE_TYPES)
             );
         }
@@ -228,7 +229,7 @@ class PayloadBuilder
     public function httpMethod(string $method): static
     {
         if (! in_array(strtolower($method), self::VALID_HTTP_METHODS, true)) {
-            throw new \InvalidArgumentException(
+            throw new InvalidArgumentException(
                 'Invalid http_method. Allowed: ' . implode(', ', self::VALID_HTTP_METHODS)
             );
         }
@@ -255,7 +256,7 @@ class PayloadBuilder
     {
         foreach ($codes as $code) {
             if (! is_int($code) || $code < 100 || $code > 599) {
-                throw new \InvalidArgumentException("Invalid HTTP status code: {$code}");
+                throw new InvalidArgumentException("Invalid HTTP status code: {$code}");
             }
         }
 
@@ -314,7 +315,7 @@ class PayloadBuilder
     /**
      * Validate and return the assembled payload array.
      *
-     * @throws \InvalidArgumentException  When neither url nor query is set.
+     * @throws InvalidArgumentException  When neither url nor query is set.
      * @throws DecodoException            When the url is invalid.
      */
     public function build(): array
@@ -340,7 +341,7 @@ class PayloadBuilder
         }
 
         if (empty($urls)) {
-            throw new \InvalidArgumentException('Batch request must contain at least one URL.');
+            throw new InvalidArgumentException('Batch request must contain at least one URL.');
         }
 
         $base = $this->payload;
@@ -463,7 +464,7 @@ class PayloadBuilder
             return null;
         }
 
-        // Check for common multi-part TLDs like .co.uk, .com.au, etc.
+        // Check for common multipart TLDs like .co.uk, .com.au, etc.
         if ($count >= 3) {
             $last = $parts[$count - 1];
             $penultimate = $parts[$count - 2];
@@ -484,14 +485,14 @@ class PayloadBuilder
         $hasQuery = isset($this->payload['query'])  && is_string($this->payload['query']);
 
         if (! $hasUrl && ! $hasQuery) {
-            throw new \InvalidArgumentException(
+            throw new InvalidArgumentException(
                 'A url or query parameter is required for every Decodo request.'
             );
         }
 
         // POST requires a payload body
         if (($this->payload['http_method'] ?? 'get') === 'post' && empty($this->payload['payload'])) {
-            throw new \InvalidArgumentException(
+            throw new InvalidArgumentException(
                 'A base64-encoded payload body is required when http_method is POST. Use ->payload($body).'
             );
         }

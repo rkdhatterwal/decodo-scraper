@@ -2,6 +2,7 @@
 
 namespace Rkdhatterwal\DecodoScraper;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Collection;
 use Rkdhatterwal\DecodoScraper\DTOs\ScrapeResult;
@@ -43,6 +44,7 @@ class DecodoClient
      * Scrape a single URL and return the first result.
      *
      * @param  array<string, mixed>  $options  Any payload parameters (see PayloadBuilder).
+     * @throws ConnectionException
      */
     public function scrape(string $url, array $options = []): ScrapeResult
     {
@@ -58,9 +60,10 @@ class DecodoClient
     /**
      * Scrape multiple URLs in a single request and return a Collection of results.
      *
-     * @param  string[]              $urls
+     * @param  string[]  $urls
      * @param  array<string, mixed>  $options
      * @return Collection<int, ScrapeResult>
+     * @throws ConnectionException
      */
     public function scrapeMany(array $urls, array $options = []): Collection
     {
@@ -132,6 +135,7 @@ class DecodoClient
      * Execute a request built manually with PayloadBuilder.
      *
      * @return Collection<int, ScrapeResult>
+     * @throws ConnectionException
      */
     public function send(PayloadBuilder $builder): Collection
     {
@@ -144,6 +148,7 @@ class DecodoClient
 
     /**
      * @return Collection<int, ScrapeResult>
+     * @throws ConnectionException
      */
     private function sendScrapeRequest(array $payload): Collection
     {

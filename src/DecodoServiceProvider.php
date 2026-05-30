@@ -3,6 +3,7 @@
 namespace Rkdhatterwal\DecodoScraper;
 
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Support\ServiceProvider;
 use Rkdhatterwal\DecodoScraper\Cache\DecodoResultCache;
 use Rkdhatterwal\DecodoScraper\Console\Commands\DecodoStatus;
@@ -26,7 +27,7 @@ class DecodoServiceProvider extends ServiceProvider
             }
 
             return new DecodoClient(
-                $app->make(\Illuminate\Http\Client\Factory::class),
+                $app->make(Factory::class),
                 $token,
                 $config,
             );
@@ -42,7 +43,7 @@ class DecodoServiceProvider extends ServiceProvider
             }
 
             return new AsyncDecodoClient(
-                $app->make(\Illuminate\Http\Client\Factory::class),
+                $app->make(Factory::class),
                 $token,
                 $config,
             );
