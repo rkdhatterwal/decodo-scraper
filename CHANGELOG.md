@@ -6,6 +6,16 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-05-30
+### Added
+- Added `.gitignore` to exclude `.junie` and `.idea` directories.
+
+### Improved
+- Refactored codebase to optimize and sort imports.
+- Normalized exception handling across the entire package.
+- Improved PHPDoc annotations and type hinting for better IDE support.
+- Enhanced code style consistency.
+
 ## [1.1.1] - 2026-05-28
 ### Added
 - Support for Laravel 13, Pest 4, and PHPUnit 12.

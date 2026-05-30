@@ -129,6 +129,23 @@ $task = DecodoAsync::queueTask(
 );
 ```
 
+### Queue with PayloadBuilder
+
+You can also use the `PayloadBuilder` with async tasks for a more fluent experience:
+
+```php
+use Rkdhatterwal\DecodoScraper\PayloadBuilder;
+use Rkdhatterwal\DecodoScraper\Facades\DecodoAsync;
+
+$task = DecodoAsync::queueTaskWithBuilder(
+    (new PayloadBuilder())
+        ->url('https://example.com')
+        ->headless('html')
+        ->geo('United States')
+        ->markdown()
+);
+```
+
 ### Queue a batch
 
 Decodo enforces a 1-request-per-second rate limit on batch submissions. The package handles this for you automatically.
@@ -339,6 +356,17 @@ $fake->fakeBatch(['task-1', 'task-2']);
 DecodoAsync::queueBatch(['https://a.com', 'https://b.com']);
 
 $fake->assertBatchQueued(2); // asserts batch with 2 URLs was queued
+```
+
+### Other Assertions
+
+```php
+$fake->assertNotScraped('https://example.com');
+$fake->assertScrapeCount(5);
+$fake->assertTaskNotQueued('https://example.com');
+$fake->assertTaskQueuedCount(3);
+$fake->assertBatchQueuedCount(1);
+$fake->assertNothingSent();
 ```
 
 ---
